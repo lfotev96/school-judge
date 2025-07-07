@@ -91,8 +91,7 @@ def admin():
 
 @app.route("/create-task", methods=["GET", "POST"])
 def create_task():
-    if "user_id" not in session or session.get("role") != "teacher":
-        return redirect("/login")
+    
 
     if request.method == "POST":
         title = request.form["title"]
@@ -108,8 +107,7 @@ def create_task():
 
 @app.route("/edit-task/<int:task_id>", methods=["GET", "POST"])
 def edit_task(task_id):
-    if "user_id" not in session or session.get("role") != "admin":
-        return redirect("/login")
+    
 
     task = Task.query.get_or_404(task_id)
 
@@ -124,8 +122,7 @@ def edit_task(task_id):
 
 @app.route("/delete-task/<int:task_id>")
 def delete_task(task_id):
-    if "user_id" not in session or session.get("role") != "admin":
-        return redirect("/login")
+    
 
     task = Task.query.get_or_404(task_id)
     db.session.delete(task)
@@ -134,8 +131,7 @@ def delete_task(task_id):
 
 @app.route("/toggle-task/<int:task_id>")
 def toggle_task(task_id):
-    if "user_id" not in session or session.get("role") != "admin":
-        return redirect("/login")
+    
 
     task = Task.query.get_or_404(task_id)
     task.active = not task.active
