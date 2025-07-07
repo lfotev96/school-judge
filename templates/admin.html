@@ -1,19 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head><title>Админ панел</title></head>
-<body>
-    <h2>Добре дошъл, {{ session['user_name'] }} (учител)</h2>
-    <a href="/logout">Изход</a>
-    <h3>Добави нова задача</h3>
-    <form method="post" action="/add_task">
-        <input type="text" name="title" required>
-        <input type="submit" value="Добави">
-    </form>
-    <h3>Качени решения</h3>
-    <ul>
-        {% for up in uploads %}
-            <li>{{ up.name }} => <b>{{ up.title }}</b> — <a href="/download/{{ up.filename }}">Изтегли</a></li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
+<!doctype html>
+<title>Админ панел</title>
+<h2>Админ панел - Управление на задачи</h2>
+<a href="{{ url_for('logout') }}">Изход</a>
+<ul>
+  {% for task in tasks %}
+    <li>{{ task.title }} - <a href="{{ url_for('task_detail', task_id=task.id) }}">Редактирай/Прегледай</a></li>
+  {% else %}
+    <li>Няма задачи</li>
+  {% endfor %}
+</ul>

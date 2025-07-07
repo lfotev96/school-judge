@@ -1,0 +1,11 @@
+<!doctype html>
+<title>Задача</title>
+<h2>{{ task.title }}</h2>
+<p>{{ task.description }}</p>
+
+<form method="post" enctype="multipart/form-data">
+  <input type="file" name="file" required>
+  <button type="submit">Качи решение</button>
+</form>
+
+<a href="{{ url_for('dashboard') }}">Назад</a>

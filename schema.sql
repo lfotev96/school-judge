@@ -1,21 +1,26 @@
-
+-- Таблица за потребители
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    role TEXT NOT NULL
+    role TEXT NOT NULL CHECK(role IN ('student', 'teacher'))
 );
 
+-- Таблица за задачи
 CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL
+    title TEXT NOT NULL,
+    description TEXT,
+    active INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE TABLE IF NOT EXISTS uploads (
+-- Таблица за решения
+CREATE TABLE IF NOT EXISTS submissions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    task_id INTEGER,
-    filename TEXT,
+    user_id INTEGER NOT NULL,
+    task_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(task_id) REFERENCES tasks(id)
 );

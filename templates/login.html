@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html>
-<head><title>Вход</title></head>
-<body>
-    <h1>Вход</h1>
-    <form method="post">
-        Име: <input type="text" name="name"><br>
-        Парола: <input type="password" name="password"><br>
-        <input type="submit" value="Влез">
-    </form>
-</body>
-</html>
+<!doctype html>
+<title>Вход</title>
+<h2>Вход</h2>
+<form method="post">
+  <input type="text" name="username" placeholder="Потребителско име" required><br>
+  <input type="password" name="password" placeholder="Парола" required><br>
+  <button type="submit">Вход</button>
+</form>
+<p>Нямаш акаунт? <a href="{{ url_for('register') }}">Регистрация</a></p>
+{% if error %}<p style="color:red;">{{ error }}</p>{% endif %}
