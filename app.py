@@ -1,123 +1,132 @@
-
-from flask import Flask, render_template, request, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask import Flask, render_template, request, redirect, url_for, session, flash
+from werkzeug.utils import secure_filename
 import os
+import sqlite3
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.secret_key = 'supersecretkey'
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-db = SQLAlchemy(app)
-login_manager = LoginManager()
-login_manager.init_app(app)
+DB_FILE = 'database.db'
 
-# Models
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True)
-    password = db.Column(db.String(120))
-    is_admin = db.Column(db.Boolean, default=False)
+# Инициализация на базата при стартиране
+def init_db():
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE,
+                password TEXT,
+                is_admin INTEGER DEFAULT 0
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT,
+                description TEXT,
+                filename TEXT,
+                active INTEGER DEFAULT 1
+            )
+        ''')
+        # Добавяме админ потребител по подразбиране, ако го няма
+        cursor.execute("SELECT * FROM users WHERE username = 'admin'")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
+                           ('admin', 'admin', 1))
+        conn.commit()
 
-class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200))
-    description = db.Column(db.Text)
-    is_active = db.Column(db.Boolean, default=True)
+init_db()  # Инициализация веднага
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-
-@app.before_first_request
-def create_tables():
-    db.create_all()
-    if not User.query.filter_by(username="admin").first():
-        admin = User(username="admin", password="admin", is_admin=True)
-        db.session.add(admin)
-        db.session.commit()
-
+# Роутове
 @app.route('/')
 def home():
-    return redirect(url_for('dashboard'))
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user = User.query.filter_by(username=request.form['username'], password=request.form['password']).first()
-        if user:
-            login_user(user)
-            return redirect(url_for('dashboard'))
-        flash("Грешно потребителско име или парола!")
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
     return render_template('login.html')
 
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.form['username']
+    password = request.form['password']
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, is_admin FROM users WHERE username=? AND password=?", (username, password))
+        user = cursor.fetchone()
+        if user:
+            session['user_id'] = user[0]
+            session['is_admin'] = bool(user[1])
+            return redirect(url_for('dashboard'))
+    flash('Невалидно потребителско име или парола', 'danger')
+    return redirect(url_for('home'))
+
 @app.route('/logout')
-@login_required
 def logout():
-    logout_user()
-    return redirect(url_for('login'))
+    session.clear()
+    return redirect(url_for('home'))
 
 @app.route('/dashboard')
-@login_required
 def dashboard():
-    tasks = Task.query.filter_by(is_active=True).all()
+    if 'user_id' not in session:
+        return redirect(url_for('home'))
+
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        if session.get('is_admin'):
+            cursor.execute("SELECT * FROM tasks ORDER BY id DESC")
+        else:
+            cursor.execute("SELECT * FROM tasks WHERE active=1 ORDER BY id DESC")
+        tasks = cursor.fetchall()
     return render_template('dashboard.html', tasks=tasks)
 
-@app.route('/admin')
-@login_required
-def admin_panel():
-    if not current_user.is_admin:
+@app.route('/add_task', methods=['GET', 'POST'])
+def add_task():
+    if not session.get('is_admin'):
         return redirect(url_for('dashboard'))
-    tasks = Task.query.all()
-    return render_template('admin.html', tasks=tasks)
 
-@app.route('/admin/create', methods=['GET', 'POST'])
-@login_required
-def create_task():
-    if not current_user.is_admin:
-        return redirect(url_for('dashboard'))
     if request.method == 'POST':
         title = request.form['title']
         description = request.form['description']
-        task = Task(title=title, description=description)
-        db.session.add(task)
-        db.session.commit()
-        return redirect(url_for('admin_panel'))
-    return render_template('edit_task.html', action="Създай")
-
-@app.route('/admin/edit/<int:task_id>', methods=['GET', 'POST'])
-@login_required
-def edit_task(task_id):
-    if not current_user.is_admin:
+        file = request.files['file']
+        filename = ''
+        if file:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        with sqlite3.connect(DB_FILE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO tasks (title, description, filename, active) VALUES (?, ?, ?, ?)",
+                           (title, description, filename, 1))
+            conn.commit()
         return redirect(url_for('dashboard'))
-    task = Task.query.get_or_404(task_id)
-    if request.method == 'POST':
-        task.title = request.form['title']
-        task.description = request.form['description']
-        db.session.commit()
-        return redirect(url_for('admin_panel'))
-    return render_template('edit_task.html', task=task, action="Редактирай")
 
-@app.route('/admin/delete/<int:task_id>')
-@login_required
+    return render_template('add_task.html')
+
+@app.route('/delete_task/<int:task_id>')
 def delete_task(task_id):
-    if not current_user.is_admin:
+    if not session.get('is_admin'):
         return redirect(url_for('dashboard'))
-    task = Task.query.get_or_404(task_id)
-    db.session.delete(task)
-    db.session.commit()
-    return redirect(url_for('admin_panel'))
 
-@app.route('/admin/toggle/<int:task_id>')
-@login_required
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+        conn.commit()
+    return redirect(url_for('dashboard'))
+
+@app.route('/toggle_task/<int:task_id>')
 def toggle_task(task_id):
-    if not current_user.is_admin:
+    if not session.get('is_admin'):
         return redirect(url_for('dashboard'))
-    task = Task.query.get_or_404(task_id)
-    task.is_active = not task.is_active
-    db.session.commit()
-    return redirect(url_for('admin_panel'))
+
+    with sqlite3.connect(DB_FILE) as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT active FROM tasks WHERE id=?", (task_id,))
+        active = cursor.fetchone()[0]
+        cursor.execute("UPDATE tasks SET active=? WHERE id=?", (1 - active, task_id))
+        conn.commit()
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     app.run(debug=True)
