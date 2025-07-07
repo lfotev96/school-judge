@@ -118,7 +118,17 @@ def delete_task(task_id):
     db.session.delete(task)
     db.session.commit()
     return redirect(url_for('admin'))
+    
+@app.route("/toggle-task/<int:task_id>")
+def toggle_task(task_id):
+    if "user_id" not in session or session.get("role") != "teacher":
+        return redirect("/login")
 
+    task = Task.query.get_or_404(task_id)
+    task.active = not task.active
+    db.session.commit()
+    return redirect("/admin")
+    
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()

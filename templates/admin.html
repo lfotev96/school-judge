@@ -1,77 +1,43 @@
-
 <!DOCTYPE html>
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
-    <title>Админ панел | Judge система</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Админ Панел</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body class="bg-light">
-
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark px-4">
-    <a class="navbar-brand" href="/">← Назад</a>
-    <div class="ms-auto">
-        <a href="/logout" class="btn btn-outline-light btn-sm">Изход</a>
-    </div>
-</nav>
-
-<div class="container mt-5">
-    <h2>Управление на задачи</h2>
-
-    <form method="POST" action="/admin/create" class="row g-3 mt-3 mb-4">
-        <div class="col-md-4">
-            <input type="text" name="title" class="form-control" placeholder="Име на задачата" required>
-        </div>
-        <div class="col-md-4">
-            <input type="text" name="description" class="form-control" placeholder="Описание" required>
-        </div>
-        <div class="col-md-2">
-            <select name="active" class="form-select" required>
-                <option value="1">Активна</option>
-                <option value="0">Неактивна</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-primary w-100">Добави задача</button>
-        </div>
-    </form>
+<body class="container mt-5">
+    <h2>Админ Панел – Управление на задачи</h2>
+    
+    <a href="/create-task" class="btn btn-success mb-3">Създай нова задача</a>
+    <a href="/" class="btn btn-secondary mb-3">Начало</a>
 
     {% if tasks %}
-    <table class="table table-bordered bg-white">
-        <thead>
-            <tr>
-                <th>Име</th>
-                <th>Описание</th>
-                <th>Активна</th>
-                <th>Действия</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for task in tasks %}
-            <tr>
-                <td>{{ task.title }}</td>
-                <td>{{ task.description }}</td>
-                <td>{{ 'Да' if task.active else 'Не' }}</td>
-                <td>
-                    <form action="/admin/toggle/{{ task.id }}" method="POST" style="display:inline;">
-                        <button class="btn btn-sm btn-outline-secondary" type="submit">
-                            Превключи
-                        </button>
-                    </form>
-                    <form action="/admin/delete/{{ task.id }}" method="POST" style="display:inline;">
-                        <button class="btn btn-sm btn-outline-danger" type="submit">
-                            Изтрий
-                        </button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Заглавие</th>
+                    <th>Активна</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr>
+                    <td>{{ task.title }}</td>
+                    <td>{{ 'Да' if task.active else 'Не' }}</td>
+                    <td>
+                        <a href="/edit-task/{{ task.id }}" class="btn btn-warning btn-sm">Редакция</a>
+                        <a href="/delete-task/{{ task.id }}" class="btn btn-danger btn-sm">Изтрий</a>
+                        <a href="/toggle-task/{{ task.id }}" class="btn btn-info btn-sm">
+                            {% if task.active %}Деактивирай{% else %}Активирай{% endif %}
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     {% else %}
-        <p class="text-muted">Няма създадени задачи.</p>
+        <p>Няма създадени задачи.</p>
     {% endif %}
-</div>
-
 </body>
 </html>
