@@ -8,7 +8,7 @@
 <body class="container mt-5">
     <h2>Админ Панел – Управление на задачи</h2>
     
-    <a href="/create-task" class="btn btn-success mb-3">Създай нова задача</a>
+    <a href="/create_task" class="btn btn-success mb-3">Създай нова задача</a>
     <a href="/" class="btn btn-secondary mb-3">Начало</a>
 
     {% if tasks %}
@@ -26,9 +26,9 @@
                     <td>{{ task.title }}</td>
                     <td>{{ 'Да' if task.active else 'Не' }}</td>
                     <td>
-                        <a href="/edit-task/{{ task.id }}" class="btn btn-warning btn-sm">Редакция</a>
-                        <a href="/delete-task/{{ task.id }}" class="btn btn-danger btn-sm">Изтрий</a>
-                        <a href="/toggle-task/{{ task.id }}" class="btn btn-info btn-sm">
+                        <a href="/edit_task/{{ task.id }}" class="btn btn-warning btn-sm">Редакция</a>
+                        <a href="/delete_task/{{ task.id }}" class="btn btn-danger btn-sm">Изтрий</a>
+                        <a href="/toggle_task/{{ task.id }}" class="btn btn-info btn-sm">
                             {% if task.active %}Деактивирай{% else %}Активирай{% endif %}
                         </a>
                     </td>
