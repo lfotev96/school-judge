@@ -1,8 +1,22 @@
-<!DOCTYPE html>
-<html>
-<head><title>Начало</title></head>
-<body>
-    <h1>Добре дошли!</h1>
-    <a href="/login">Вход</a> | <a href="/register">Регистрация</a>
-</body>
-</html>
+
+<!doctype html>
+<title>Начало</title>
+<h2>Добре дошъл, {{ user.username }}!</h2>
+{% if user.role == 'student' %}
+    <h3>Активни задачи:</h3>
+    <ul>
+    {% for task in tasks %}
+        <li>
+            <strong>{{ task.title }}</strong><br>
+            {{ task.description }}<br>
+            <form action="{{ url_for('submit', task_id=task.id) }}" method="post" enctype="multipart/form-data">
+                <input type="file" name="solution">
+                <input type="submit" value="Качи">
+            </form>
+        </li>
+    {% endfor %}
+    </ul>
+{% elif user.role == 'admin' %}
+    <a href="{{ url_for('admin') }}">Към админ панела</a>
+{% endif %}
+<br><a href="{{ url_for('logout') }}">Изход</a>

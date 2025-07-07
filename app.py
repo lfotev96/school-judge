@@ -1,85 +1,96 @@
-from flask import Flask, render_template, redirect, url_for, request, session, flash, send_from_directory
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
+
 import os
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
+from werkzeug.utils import secure_filename
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.secret_key = 'supersecretkey'
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# === Models ===
-
+# Модели
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120))
-    email = db.Column(db.String(120), unique=True)
-    password = db.Column(db.String(200))
-    is_admin = db.Column(db.Boolean, default=False)
+    username = db.Column(db.String(80), nullable=False)
+    password = db.Column(db.String(80), nullable=False)
+    role = db.Column(db.String(10), nullable=False)
 
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200))
-    description = db.Column(db.Text)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
 
-class Submission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer)
-    task_id = db.Column(db.Integer)
-    filename = db.Column(db.String(300))
-
-# === Create initial admin ===
-
-with app.app_context():
-    db.create_all()
-    if not User.query.filter_by(email='admin@school.local').first():
-        admin = User(
-            name='Админ',
-            email='admin@school.local',
-            password=generate_password_hash('admin123'),
-            is_admin=True
-        )
-        db.session.add(admin)
-        db.session.commit()
-
-# === Routes ===
-
+# Начална страница
 @app.route('/')
 def index():
-    if 'user_id' in session:
-        user = User.query.get(session['user_id'])
-        tasks = Task.query.filter_by(is_active=True).all() if not user.is_admin else Task.query.all()
-        return render_template('dashboard.html', user=user, tasks=tasks)
-    return redirect(url_for('login'))
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    tasks = Task.query.filter_by(is_active=True).all() if user.role == 'student' else []
+    return render_template('index.html', user=user, tasks=tasks)
 
+# Регистрация
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        role = request.form['role']
+        user = User(username=username, password=password, role=role)
+        db.session.add(user)
+        db.session.commit()
+        return redirect(url_for('login'))
+    return render_template('register.html')
+
+# Вход
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email')
-        password = request.form.get('password')
-        user = User.query.filter_by(email=email).first()
-        if user and check_password_hash(user.password, password):
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username, password=password).first()
+        if user:
             session['user_id'] = user.id
             return redirect(url_for('index'))
-        flash('Невалидни данни за вход.')
+        return 'Невалидни данни'
     return render_template('login.html')
 
+# Изход
 @app.route('/logout')
 def logout():
-    session.clear()
+    session.pop('user_id', None)
     return redirect(url_for('login'))
 
-@app.route('/create_task', methods=['GET', 'POST'])
-def create_task():
-    if not session.get('user_id'): return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not user.is_admin: return redirect(url_for('index'))
+# Качване на решение
+@app.route('/submit/<int:task_id>', methods=['POST'])
+def submit(task_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    file = request.files['solution']
+    filename = secure_filename(file.filename)
+    upload_path = os.path.join(app.config['UPLOAD_FOLDER'], str(session['user_id']))
+    os.makedirs(upload_path, exist_ok=True)
+    file.save(os.path.join(upload_path, filename))
+    return 'Файлът е качен успешно!'
 
+# Админ панел
+@app.route('/admin')
+def admin():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    user = User.query.get(session['user_id'])
+    if user.role != 'admin':
+        return redirect(url_for('index'))
+    tasks = Task.query.all()
+    return render_template('admin.html', tasks=tasks)
+
+@app.route('/admin/create', methods=['GET', 'POST'])
+def create_task():
     if request.method == 'POST':
         title = request.form['title']
         description = request.form['description']
@@ -87,65 +98,29 @@ def create_task():
         task = Task(title=title, description=description, is_active=is_active)
         db.session.add(task)
         db.session.commit()
-        return redirect(url_for('index'))
-
+        return redirect(url_for('admin'))
     return render_template('create_task.html')
 
-@app.route('/edit_task/<int:task_id>', methods=['GET', 'POST'])
+@app.route('/admin/edit/<int:task_id>', methods=['GET', 'POST'])
 def edit_task(task_id):
-    if not session.get('user_id'): return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not user.is_admin: return redirect(url_for('index'))
-
-    task = Task.query.get_or_404(task_id)
-
+    task = Task.query.get(task_id)
     if request.method == 'POST':
         task.title = request.form['title']
         task.description = request.form['description']
         task.is_active = 'is_active' in request.form
         db.session.commit()
-        return redirect(url_for('index'))
-
+        return redirect(url_for('admin'))
     return render_template('edit_task.html', task=task)
 
-@app.route('/delete_task/<int:task_id>', methods=['POST'])
+@app.route('/admin/delete/<int:task_id>')
 def delete_task(task_id):
-    if not session.get('user_id'): return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if not user.is_admin: return redirect(url_for('index'))
-
-    task = Task.query.get_or_404(task_id)
+    task = Task.query.get(task_id)
     db.session.delete(task)
     db.session.commit()
-    return redirect(url_for('index'))
-
-@app.route('/upload/<int:task_id>', methods=['GET', 'POST'])
-def upload(task_id):
-    if not session.get('user_id'): return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    task = Task.query.get_or_404(task_id)
-
-    if request.method == 'POST':
-        file = request.files['file']
-        if file:
-            filename = secure_filename(file.filename)
-            save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(save_path)
-            submission = Submission(user_id=user.id, task_id=task.id, filename=filename)
-            db.session.add(submission)
-            db.session.commit()
-            flash('Файлът е качен успешно!')
-            return redirect(url_for('index'))
-
-    return render_template('upload.html', task=task)
-
-@app.route('/uploads/<filename>')
-def uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-# === Start ===
+    return redirect(url_for('admin'))
 
 if __name__ == '__main__':
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    with app.app_context():
+        db.create_all()
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
