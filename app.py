@@ -89,36 +89,49 @@ def admin():
     tasks = Task.query.all()
     return render_template('admin.html', tasks=tasks)
 
-@app.route('/admin/create', methods=['GET', 'POST'])
+@app.route("/create-task", methods=["GET", "POST"])
 def create_task():
-    if request.method == 'POST':
-        title = request.form['title']
-        description = request.form['description']
-        is_active = 'is_active' in request.form
-        task = Task(title=title, description=description, is_active=is_active)
-        db.session.add(task)
-        db.session.commit()
-        return redirect(url_for('admin'))
-    return render_template('create_task.html')
+    if "user_id" not in session or session.get("role") != "teacher":
+        return redirect("/login")
 
-@app.route('/admin/edit/<int:task_id>', methods=['GET', 'POST'])
+    if request.method == "POST":
+        title = request.form["title"]
+        description = request.form["description"]
+        active = "active" in request.form
+
+        new_task = Task(title=title, description=description, active=active)
+        db.session.add(new_task)
+        db.session.commit()
+        return redirect("/admin")
+
+    return render_template("create_task.html")
+
+@app.route("/edit-task/<int:task_id>", methods=["GET", "POST"])
 def edit_task(task_id):
-    task = Task.query.get(task_id)
-    if request.method == 'POST':
-        task.title = request.form['title']
-        task.description = request.form['description']
-        task.is_active = 'is_active' in request.form
-        db.session.commit()
-        return redirect(url_for('admin'))
-    return render_template('edit_task.html', task=task)
+    if "user_id" not in session or session.get("role") != "teacher":
+        return redirect("/login")
 
-@app.route('/admin/delete/<int:task_id>')
+    task = Task.query.get_or_404(task_id)
+
+    if request.method == "POST":
+        task.title = request.form["title"]
+        task.description = request.form["description"]
+        task.active = "active" in request.form
+        db.session.commit()
+        return redirect("/admin")
+
+    return render_template("edit_task.html", task=task)
+
+@app.route("/delete-task/<int:task_id>")
 def delete_task(task_id):
-    task = Task.query.get(task_id)
+    if "user_id" not in session or session.get("role") != "teacher":
+        return redirect("/login")
+
+    task = Task.query.get_or_404(task_id)
     db.session.delete(task)
     db.session.commit()
-    return redirect(url_for('admin'))
-    
+    return redirect("/admin")
+
 @app.route("/toggle-task/<int:task_id>")
 def toggle_task(task_id):
     if "user_id" not in session or session.get("role") != "teacher":
@@ -128,7 +141,6 @@ def toggle_task(task_id):
     task.active = not task.active
     db.session.commit()
     return redirect("/admin")
-    
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
