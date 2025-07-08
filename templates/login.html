@@ -1,10 +1,9 @@
-
-<!doctype html>
-<title>Вход</title>
+{% extends "layout.html" %}
+{% block content %}
 <h2>Вход</h2>
 <form method="post">
-    Потребителско име: <input type="text" name="username"><br>
+    Имейл: <input type="email" name="email"><br>
     Парола: <input type="password" name="password"><br>
-    <input type="submit" value="Вход">
+    <button type="submit">Влез</button>
 </form>
-<a href="{{ url_for('register') }}">Регистрация</a>
+{% endblock %}

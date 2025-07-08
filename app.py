@@ -1,144 +1,125 @@
-
 import os
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory
+import sqlite3
+from flask import Flask, render_template, request, redirect, session, send_from_directory
 from werkzeug.utils import secure_filename
-from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'
+app.secret_key = 'verysecretkey'
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db = SQLAlchemy(app)
+DATABASE = 'database.db'
 
-# Модели
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)
-    password = db.Column(db.String(80), nullable=False)
-    role = db.Column(db.String(10), nullable=False)
 
-class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(120), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-# Начална страница
+
+@app.before_request
+def before_first_request():
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL,
+            filename TEXT,
+            is_active INTEGER DEFAULT 1
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+
 @app.route('/')
 def index():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    tasks = Task.query.filter_by(is_active=True).all() if user.role == 'student' else []
-    return render_template('index.html', user=user, tasks=tasks)
+    conn = get_db_connection()
+    tasks = conn.execute('SELECT * FROM tasks WHERE is_active = 1').fetchall()
+    conn.close()
+    return render_template('index.html', tasks=tasks)
 
-# Регистрация
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username']
+        email = request.form['email']
         password = request.form['password']
-        role = request.form['role']
-        user = User(username=username, password=password, role=role)
-        db.session.add(user)
-        db.session.commit()
-        return redirect(url_for('login'))
+        conn = get_db_connection()
+        conn.execute('INSERT INTO users (email, password) VALUES (?, ?)', (email, password))
+        conn.commit()
+        conn.close()
+        return redirect('/login')
     return render_template('register.html')
 
-# Вход
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        email = request.form['email']
         password = request.form['password']
-        user = User.query.filter_by(username=username, password=password).first()
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE email = ? AND password = ?', (email, password)).fetchone()
+        conn.close()
         if user:
-            session['user_id'] = user.id
-            return redirect(url_for('index'))
-        return 'Невалидни данни'
+            session['user_id'] = user['id']
+            session['is_admin'] = user['is_admin']
+            return redirect('/admin' if user['is_admin'] else '/')
+        else:
+            return 'Invalid credentials'
     return render_template('login.html')
 
-# Изход
+
 @app.route('/logout')
 def logout():
-    session.pop('user_id', None)
-    return redirect(url_for('login'))
+    session.clear()
+    return redirect('/')
 
-# Качване на решение
-@app.route('/submit/<int:task_id>', methods=['POST'])
-def submit(task_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    file = request.files['solution']
-    filename = secure_filename(file.filename)
-    upload_path = os.path.join(app.config['UPLOAD_FOLDER'], str(session['user_id']))
-    os.makedirs(upload_path, exist_ok=True)
-    file.save(os.path.join(upload_path, filename))
-    return 'Файлът е качен успешно!'
 
-# Админ панел
 @app.route('/admin')
 def admin():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = User.query.get(session['user_id'])
-    if user.role != 'admin':
-        return redirect(url_for('index'))
-    tasks = Task.query.all()
+    if not session.get('is_admin'):
+        return redirect('/')
+    conn = get_db_connection()
+    tasks = conn.execute('SELECT * FROM tasks').fetchall()
+    conn.close()
     return render_template('admin.html', tasks=tasks)
 
-@app.route("/create-task", methods=["GET", "POST"])
+
+@app.route('/create-task', methods=['GET', 'POST'])
 def create_task():
-    
+    if not session.get('is_admin'):
+        return redirect('/')
+    if request.method == 'POST':
+        title = request.form['title']
+        description = request.form['description']
+        is_active = 1 if request.form.get('is_active') == 'on' else 0
+        file = request.files.get('file')
+        filename = None
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        conn = get_db_connection()
+        conn.execute('INSERT INTO tasks (title, description, filename, is_active) VALUES (?, ?, ?, ?)',
+                     (title, description, filename, is_active))
+        conn.commit()
+        conn.close()
+        return redirect('/admin')
+    return render_template('create_task.html')
 
-    if request.method == "POST":
-        title = request.form["title"]
-        description = request.form["description"]
-        active = "active" in request.form
 
-        new_task = Task(title=title, description=description, active=active)
-        db.session.add(new_task)
-        db.session.commit()
-        return redirect("/admin")
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-    return render_template("create_task.html")
 
-@app.route("/edit-task/<int:task_id>", methods=["GET", "POST"])
-def edit_task(task_id):
-    
-
-    task = Task.query.get_or_404(task_id)
-
-    if request.method == "POST":
-        task.title = request.form["title"]
-        task.description = request.form["description"]
-        task.active = "active" in request.form
-        db.session.commit()
-        return redirect("/admin")
-
-    return render_template("edit_task.html", task=task)
-
-@app.route("/delete-task/<int:task_id>")
-def delete_task(task_id):
-    
-
-    task = Task.query.get_or_404(task_id)
-    db.session.delete(task)
-    db.session.commit()
-    return redirect("/admin")
-
-@app.route("/toggle-task/<int:task_id>")
-def toggle_task(task_id):
-    
-
-    task = Task.query.get_or_404(task_id)
-    task.active = not task.active
-    db.session.commit()
-    return redirect("/admin")
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)

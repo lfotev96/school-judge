@@ -1,14 +1,9 @@
-
-<!doctype html>
-<title>Регистрация</title>
+{% extends "layout.html" %}
+{% block content %}
 <h2>Регистрация</h2>
 <form method="post">
-    Потребителско име: <input type="text" name="username"><br>
+    Имейл: <input type="email" name="email"><br>
     Парола: <input type="password" name="password"><br>
-    Роля:
-    <select name="role">
-        <option value="student">Ученик</option>
-        <option value="admin">Админ</option>
-    </select><br>
-    <input type="submit" value="Регистрация">
+    <button type="submit">Регистрирай се</button>
 </form>
+{% endblock %}

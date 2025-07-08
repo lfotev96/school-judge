@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Judge System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Judge System</h1>
+        <nav>
+            {% if session.get('user_id') %}
+                <a href="/">Начало</a>
+                {% if session.get('is_admin') %}
+                    <a href="/admin">Админ</a>
+                    <a href="/create-task">Създай задача</a>
+                {% endif %}
+                <a href="/logout">Изход</a>
+            {% else %}
+                <a href="/login">Вход</a>
+                <a href="/register">Регистрация</a>
+            {% endif %}
+        </nav>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
