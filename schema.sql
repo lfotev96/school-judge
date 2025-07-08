@@ -1,26 +1,24 @@
--- Таблица за потребители
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS user (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
+    email TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('student', 'teacher'))
+    is_admin INTEGER DEFAULT 0
 );
 
--- Таблица за задачи
-CREATE TABLE IF NOT EXISTS tasks (
+CREATE TABLE IF NOT EXISTS task (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     description TEXT,
-    active INTEGER NOT NULL DEFAULT 1
+    is_active INTEGER DEFAULT 1,
+    file_path TEXT
 );
 
--- Таблица за решения
-CREATE TABLE IF NOT EXISTS submissions (
+CREATE TABLE IF NOT EXISTS submission (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    task_id INTEGER NOT NULL,
-    filename TEXT NOT NULL,
+    user_id INTEGER,
+    task_id INTEGER,
+    file_path TEXT,
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(task_id) REFERENCES tasks(id)
+    FOREIGN KEY(user_id) REFERENCES user(id),
+    FOREIGN KEY(task_id) REFERENCES task(id)
 );

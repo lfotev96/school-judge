@@ -16,6 +16,12 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def init_db():
+    with app.app_context():
+        db = get_db()
+        with open('schema.sql', mode='r') as f:
+            db.cursor().executescript(f.read())
+        db.commit()
 
 def get_db():
     if 'db' not in g:
