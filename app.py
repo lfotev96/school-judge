@@ -1,7 +1,8 @@
 import os
 import sqlite3
-from flask import Flask, render_template, request, redirect, session, send_from_directory
+from flask import Flask, render_template, request, redirect, session, url_for, send_from_directory, g
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = 'verysecretkey'
@@ -16,6 +17,18 @@ def get_db_connection():
     return conn
 
 
+def get_db():
+    if 'db' not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+@app.teardown_appcontext
+def close_db(exception):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
+        
 @app.before_request
 def before_first_request():
     conn = get_db_connection()
