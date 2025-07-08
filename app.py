@@ -103,12 +103,12 @@ def secret_register():
         password = request.form["password"]
         is_admin = True if request.form.get("is_admin") == "on" else False
 
-        #if get_db().execute("SELECT * FROM user WHERE email = ?", (email,)).fetchone():
-         #   return "Потребител с този имейл вече съществува."
+        if get_db().execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone():
+            return "Потребител с този имейл вече съществува."
 
         hashed_password = generate_password_hash(password)
         db = get_db()
-        db.execute("INSERT INTO user (email, password, is_admin) VALUES (?, ?, ?)", (email, hashed_password, is_admin))
+        db.execute("INSERT INTO users (email, password, is_admin) VALUES (?, ?, ?)", (email, hashed_password, is_admin))
         db.commit()
 
         return "Регистрацията беше успешна."
