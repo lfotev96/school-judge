@@ -86,14 +86,16 @@ def login():
         email = request.form['email']
         password = request.form['password']
         conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE email = ? AND password = ?', (email, password)).fetchone()
+        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
         conn.close()
-        if user:
+
+        if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
             session['is_admin'] = user['is_admin']
             return redirect('/admin' if user['is_admin'] else '/')
         else:
             return 'Invalid credentials'
+
     return render_template('login.html')
 
 @app.route("/secret-register", methods=["GET", "POST"])
